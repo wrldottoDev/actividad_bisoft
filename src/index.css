@@ -1,0 +1,94 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;700&display=swap');
+@import 'tailwindcss';
+
+:root {
+  --app-bg: #f5f7fb;
+  --panel: rgba(255, 255, 255, 0.82);
+  --panel-line: rgba(148, 163, 184, 0.2);
+  --text-body: #475569;
+  --text-strong: #0f172a;
+  --shadow-soft: 0 20px 60px -30px rgba(15, 23, 42, 0.28);
+  --shadow-card: 0 16px 32px -24px rgba(15, 23, 42, 0.4);
+}
+
+@layer base {
+  * {
+    @apply box-border;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    background:
+      radial-gradient(circle at top, rgba(14, 165, 233, 0.08), transparent 36%),
+      linear-gradient(180deg, #f8fafc 0%, #f5f7fb 100%);
+    color: var(--text-body);
+    font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  button,
+  input {
+    font: inherit;
+  }
+
+  button {
+    @apply cursor-pointer;
+  }
+
+  #root {
+    min-height: 100svh;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-[32px] border border-white/70 bg-white/78 shadow-[var(--shadow-soft)] backdrop-blur-xl;
+  }
+
+  .panel-muted {
+    @apply rounded-[28px] border border-slate-200/70 bg-slate-50/80 shadow-[var(--shadow-card)];
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-45;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-45;
+  }
+
+  .eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    @apply mb-2 text-xs font-medium uppercase tracking-[0.24em] text-slate-500;
+  }
+
+  .soft-pill {
+    font-family: 'IBM Plex Mono', monospace;
+    @apply rounded-full border border-slate-200/80 bg-white/85 px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.16em] text-slate-600 shadow-sm;
+  }
+
+  .stat-card {
+    @apply rounded-[28px] border border-slate-200/70 bg-white p-4 shadow-sm;
+  }
+
+  .stat-label {
+    font-family: 'IBM Plex Mono', monospace;
+    @apply text-[11px] uppercase tracking-[0.18em] text-slate-500;
+  }
+
+  .stat-value {
+    @apply mt-2 block text-2xl font-semibold tracking-[-0.04em] text-slate-950;
+  }
+
+  .section-title {
+    @apply text-lg font-semibold tracking-[-0.03em] text-slate-950 sm:text-xl;
+  }
+}
