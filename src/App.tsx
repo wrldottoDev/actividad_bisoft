@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useRoomGame } from './hooks/useRoomGame';
 import { HomeScreen } from './screens/HomeScreen';
 import { LobbyScreen } from './screens/LobbyScreen';
@@ -7,6 +8,7 @@ import { WaitingScreen } from './screens/WaitingScreen';
 import { formatConnectionStatus } from './utils/game';
 
 function App() {
+  const [pathname, setPathname] = useState(window.location.pathname);
   const {
     room,
     error,
@@ -20,6 +22,16 @@ function App() {
     restartMatch,
     clearLocalSession,
   } = useRoomGame();
+  const isAdminEntry = pathname === '/admin';
+
+  useEffect(() => {
+    const syncPath = () => setPathname(window.location.pathname);
+    window.addEventListener('popstate', syncPath);
+
+    return () => {
+      window.removeEventListener('popstate', syncPath);
+    };
+  }, []);
 
   const copyRoomCode = async () => {
     if (!room) {
@@ -37,6 +49,7 @@ function App() {
     if (!session || !room) {
       return (
         <HomeScreen
+          mode={isAdminEntry ? 'admin' : 'join'}
           busy={isBusy}
           error={error}
           onCreateRoom={createRoom}
@@ -45,7 +58,7 @@ function App() {
       );
     }
 
-    if (room.status === 'lobby') {
+    if (room.status === "lobby") {
       return (
         <LobbyScreen
           room={room}
@@ -61,7 +74,7 @@ function App() {
       );
     }
 
-    if (room.status === 'playing') {
+    if (room.status === "playing") {
       if (room.mission && room.myState && !room.myState.isFinished) {
         return (
           <TurnScreen
@@ -82,15 +95,10 @@ function App() {
         );
       }
 
-      return (
-        <WaitingScreen
-          room={room}
-          connectionStatus={connectionStatus}
-        />
-      );
+      return <WaitingScreen room={room} connectionStatus={connectionStatus} />;
     }
 
-    if (room.status === 'finished') {
+    if (room.status === "finished") {
       return (
         <FinalRankingScreen
           players={room.players}
@@ -132,12 +140,14 @@ function App() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <span className="soft-pill">FastAPI</span>
-            <span className="soft-pill">WebSocket</span>
-            <span className="soft-pill">SQLite</span>
-            {room ? <span className="soft-pill">Sala {room.roomCode}</span> : null}
+            {room ? (
+              <span className="soft-pill">Sala {room.roomCode}</span>
+            ) : null}
             {session ? (
-              <button className="btn-secondary !px-4 !py-2" onClick={clearLocalSession}>
+              <button
+                className="btn-secondary !px-4 !py-2"
+                onClick={clearLocalSession}
+              >
                 Salir local
               </button>
             ) : null}
@@ -167,7 +177,7 @@ function App() {
                 Estado
               </p>
               <p className="mt-2 text-lg font-semibold text-slate-950">
-                {room?.status === 'finished'
+                {room?.status === "finished"
                   ? 'Finalizada'
                   : room?.status === 'playing'
                     ? 'En partida'
