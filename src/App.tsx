@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
-import { useRoomGame } from './hooks/useRoomGame';
-import { HomeScreen } from './screens/HomeScreen';
-import { LobbyScreen } from './screens/LobbyScreen';
-import { FinalRankingScreen } from './screens/FinalRankingScreen';
-import { TurnScreen } from './screens/TurnScreen';
-import { WaitingScreen } from './screens/WaitingScreen';
-import { formatConnectionStatus } from './utils/game';
+import { useEffect, useState } from "react";
+import { useRoomGame } from "./hooks/useRoomGame";
+import { HomeScreen } from "./screens/HomeScreen";
+import { LobbyScreen } from "./screens/LobbyScreen";
+import { FinalRankingScreen } from "./screens/FinalRankingScreen";
+import { TurnScreen } from "./screens/TurnScreen";
+import { WaitingScreen } from "./screens/WaitingScreen";
+import { formatConnectionStatus } from "./utils/game";
 
 function App() {
   const [pathname, setPathname] = useState(window.location.pathname);
@@ -23,14 +23,14 @@ function App() {
     restartMatch,
     clearLocalSession,
   } = useRoomGame();
-  const isAdminEntry = pathname === '/admin';
+  const isAdminEntry = pathname === "/admin";
 
   useEffect(() => {
     const syncPath = () => setPathname(window.location.pathname);
-    window.addEventListener('popstate', syncPath);
+    window.addEventListener("popstate", syncPath);
 
     return () => {
-      window.removeEventListener('popstate', syncPath);
+      window.removeEventListener("popstate", syncPath);
     };
   }, []);
 
@@ -50,7 +50,7 @@ function App() {
     if (!session || !room) {
       return (
         <HomeScreen
-          mode={isAdminEntry ? 'admin' : 'join'}
+          mode={isAdminEntry ? "admin" : "join"}
           busy={isBusy}
           error={error}
           onCreateRoom={createRoom}
@@ -144,7 +144,7 @@ function App() {
           <div>
             <p className="eyebrow">Endpoint Heist</p>
             <h1 className="text-2xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-3xl">
-              Sala remota simultánea con 3 retos y ranking final
+              Actividad endpoints
             </h1>
           </div>
 
@@ -170,7 +170,7 @@ function App() {
                 Jugador
               </p>
               <p className="mt-2 text-lg font-semibold text-slate-950">
-                {room?.me.name ?? 'Reconectando'}
+                {room?.me.name ?? "Reconectando"}
               </p>
             </div>
             <div className="panel-muted px-5 py-4">
@@ -187,10 +187,10 @@ function App() {
               </p>
               <p className="mt-2 text-lg font-semibold text-slate-950">
                 {room?.status === "finished"
-                  ? 'Finalizada'
-                  : room?.status === 'playing'
-                    ? 'En partida'
-                    : 'Lobby'}
+                  ? "Finalizada"
+                  : room?.status === "playing"
+                    ? "En partida"
+                    : "Lobby"}
               </p>
             </div>
           </div>
