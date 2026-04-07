@@ -10,7 +10,7 @@ function getElapsedSeconds(startedAt: string | null) {
   return Math.floor(delta / 1000);
 }
 
-export function useTurnTimer(startedAt: string | null) {
+export function useTurnTimer(startedAt: string | null, timeLimitSeconds: number) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
@@ -34,5 +34,11 @@ export function useTurnTimer(startedAt: string | null) {
     };
   }, [startedAt]);
 
-  return { elapsedSeconds };
+  const remainingSeconds = Math.max(0, timeLimitSeconds - elapsedSeconds);
+
+  return {
+    elapsedSeconds,
+    remainingSeconds,
+    isExpired: remainingSeconds === 0,
+  };
 }

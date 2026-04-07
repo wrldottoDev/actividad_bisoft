@@ -17,7 +17,6 @@ export interface MissionPayload {
   id: string;
   title: string;
   description: string;
-  objective: string;
   difficulty: 'Quick' | 'Tactical';
   availableBlocks: BlockDefinition[];
 }
@@ -29,6 +28,7 @@ export interface RoomPlayer {
   totalTime: number;
   turnsCompleted: number;
   solvedMissions: number;
+  hintsUsed: number;
   isAdmin: boolean;
   isOnline: boolean;
   isFinished: boolean;
@@ -39,6 +39,9 @@ export interface RoomRound {
   totalPlayers: number;
   completedPlayers: number;
   remainingPlayers: number;
+  roundNumber: number;
+  totalRounds: number;
+  timeLimitSeconds: number;
 }
 
 export interface PlayerRoundState {
@@ -47,6 +50,8 @@ export interface PlayerRoundState {
   attemptsRemaining: number;
   isFinished: boolean;
   feedback: string;
+  hintUsed: boolean;
+  hintText: string | null;
 }
 
 export interface TurnResult {

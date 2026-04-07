@@ -4,6 +4,7 @@ import {
   createRoom,
   fetchRoom,
   joinRoom,
+  requestHint,
   restartRoom,
   startRoom,
   validateTurn,
@@ -227,6 +228,12 @@ export function useRoomGame() {
     validateFlow: (flowIds: string[]) =>
       session
         ? runAction('validate-flow', () => validateTurn(session, flowIds), (nextRoom) =>
+            setRoom(nextRoom),
+          )
+        : Promise.resolve(null),
+    requestHint: () =>
+      session
+        ? runAction('use-hint', () => requestHint(session), (nextRoom) =>
             setRoom(nextRoom),
           )
         : Promise.resolve(null),

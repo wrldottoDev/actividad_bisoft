@@ -11,7 +11,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ApiBlock } from '../components/ApiBlock';
 import { BlockPalette } from '../components/BlockPalette';
 import { FlowBuilder } from '../components/FlowBuilder';
@@ -24,13 +24,19 @@ interface TurnScreenProps {
   player: RoomPlayer;
   mission: MissionPayload;
   ranking: RoomPlayer[];
+  roundNumber: number;
+  totalRounds: number;
   totalPlayers: number;
   completedPlayers: number;
   startedAt: string | null;
   attemptsRemaining: number;
   feedback: string;
+  hintUsed: boolean;
+  hintText: string | null;
+  timeLimitSeconds: number;
   isSubmitting: boolean;
   onValidateFlow: (flowIds: string[]) => void;
+  onUseHint: () => void;
 }
 
 function getFlowInsertionIndex(flowIds: string[], overId: string | null) {
@@ -46,17 +52,40 @@ export function TurnScreen({
   player,
   mission,
   ranking,
+  roundNumber,
+  totalRounds,
   totalPlayers,
   completedPlayers,
   startedAt,
   attemptsRemaining,
   feedback,
+  hintUsed,
+  hintText,
+  timeLimitSeconds,
   isSubmitting,
   onValidateFlow,
+  onUseHint,
 }: TurnScreenProps) {
   const [flowIds, setFlowIds] = useState<string[]>([]);
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
-  const { elapsedSeconds } = useTurnTimer(startedAt);
+  const autoSubmittedRef = useRef(false);
+  const { elapsedSeconds, remainingSeconds, isExpired } = useTurnTimer(
+    startedAt,
+    timeLimitSeconds,
+  );
+
+  useEffect(() => {
+    autoSubmittedRef.current = false;
+  }, [startedAt, mission.id]);
+
+  useEffect(() => {
+    if (!isExpired || isSubmitting || autoSubmittedRef.current) {
+      return;
+    }
+
+    autoSubmittedRef.current = true;
+    onValidateFlow(flowIds);
+  }, [flowIds, isExpired, isSubmitting, onValidateFlow]);
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -166,22 +195,33 @@ export function TurnScreen({
                 {player.name}
               </h2>
               <p className="mt-2 text-sm text-slate-500">
-                Todos juegan al mismo tiempo. El servidor valida tu flujo y actualiza el ranking en vivo.
+                Todos juegan al mismo tiempo. Tienes un minuto por reto y la partida avanza sola por 3 rondas.
               </p>
             </div>
-            <span className="soft-pill">Ronda simultánea</span>
+            <span className="soft-pill">
+              Ronda {roundNumber}/{totalRounds}
+            </span>
           </div>
         </div>
 
-        <MissionCard mission={mission} />
+        <MissionCard
+          mission={mission}
+          hintUsed={hintUsed}
+          hintText={hintText}
+          isBusy={isSubmitting || isExpired}
+          onUseHint={onUseHint}
+        />
 
         <ScorePanel
           currentPlayer={player}
           ranking={ranking}
           elapsedSeconds={elapsedSeconds}
+          remainingSeconds={remainingSeconds}
           attemptsRemaining={attemptsRemaining}
           completedPlayers={completedPlayers}
           totalPlayers={totalPlayers}
+          roundNumber={roundNumber}
+          totalRounds={totalRounds}
         />
       </div>
 
@@ -214,6 +254,10 @@ export function TurnScreen({
           <div className="rounded-[24px] border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
             {feedback}
           </div>
+        ) : isExpired ? (
+          <div className="rounded-[24px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">
+            Tiempo agotado. Enviando tu resultado.
+          </div>
         ) : (
           <div className="rounded-[24px] border border-slate-200/70 bg-white px-4 py-4 text-sm text-slate-500">
             Arrastra los bloques correctos. Puedes reordenarlos o quitarlos antes de validar.
@@ -224,14 +268,14 @@ export function TurnScreen({
           <button
             className="btn-secondary"
             onClick={() => setFlowIds([])}
-            disabled={flowIds.length === 0 || isSubmitting}
+            disabled={flowIds.length === 0 || isSubmitting || isExpired}
           >
             Limpiar flujo
           </button>
           <button
             className="btn-primary"
             onClick={() => onValidateFlow(flowIds)}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isExpired}
           >
             {isSubmitting ? 'Validando...' : 'Validar flujo'}
           </button>

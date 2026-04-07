@@ -9,6 +9,8 @@ BASE_POINTS = 100
 SECOND_ATTEMPT_PENALTY = 20
 INVALID_FLOW_PENALTY = 20
 MAX_SPEED_BONUS = 40
+MATCH_MISSION_COUNT = 3
+TURN_TIME_LIMIT_SECONDS = 60
 
 BLOCK_CATALOG: dict[str, dict[str, str]] = {
     "getMe": {"id": "get-me", "type": "GET", "label": "GET /me"},
@@ -45,7 +47,7 @@ MISSIONS: list[dict[str, Any]] = [
         "id": "mission-login-profile",
         "title": "Login y perfil",
         "description": "Obtén acceso y consulta el perfil del usuario.",
-        "objective": "POST /login -> JWT -> GET /me",
+        "hint": "Primero necesitas autenticarte, luego usar el token y al final consultar el perfil.",
         "difficulty": "Quick",
         "correctSequence": ["post-login", "jwt", "get-me"],
         "availableBlocks": _pick_blocks(
@@ -60,7 +62,7 @@ MISSIONS: list[dict[str, Any]] = [
         "id": "mission-products-order",
         "title": "Productos y orden",
         "description": "Explora el catálogo y crea una orden válida.",
-        "objective": "GET /products -> POST /orders -> Body JSON",
+        "hint": "Antes de crear la orden debes revisar el catálogo, y la creación requiere payload.",
         "difficulty": "Quick",
         "correctSequence": ["get-products", "post-orders", "body-json"],
         "availableBlocks": _pick_blocks(
@@ -75,7 +77,7 @@ MISSIONS: list[dict[str, Any]] = [
         "id": "mission-register-login-profile",
         "title": "Registro completo",
         "description": "Registra al usuario, inicia sesión y consulta su perfil.",
-        "objective": "POST /users -> POST /login -> JWT -> GET /me",
+        "hint": "Empieza creando el usuario, después autentica la sesión y termina consultando el perfil.",
         "difficulty": "Tactical",
         "correctSequence": ["post-users", "post-login", "jwt", "get-me"],
         "availableBlocks": _pick_blocks(
@@ -91,7 +93,7 @@ MISSIONS: list[dict[str, Any]] = [
         "id": "mission-update-user",
         "title": "Actualizar usuario",
         "description": "Autentica la sesión y actualiza los datos del usuario.",
-        "objective": "POST /login -> JWT -> PUT /users/:id -> Headers -> Body JSON",
+        "hint": "La actualización necesita sesión válida y, además del endpoint, debes enviar metadatos y contenido.",
         "difficulty": "Tactical",
         "correctSequence": [
             "post-login",
@@ -113,7 +115,7 @@ MISSIONS: list[dict[str, Any]] = [
         "id": "mission-secure-order",
         "title": "Orden autenticada",
         "description": "Inicia sesión y crea una orden enviando el payload correcto.",
-        "objective": "POST /login -> JWT -> POST /orders -> Headers -> Body JSON",
+        "hint": "La orden es protegida: autentica primero y luego envía tanto headers como body.",
         "difficulty": "Tactical",
         "correctSequence": [
             "post-login",
@@ -156,7 +158,6 @@ def get_public_mission(mission_id: str) -> dict[str, Any]:
         "id": mission["id"],
         "title": mission["title"],
         "description": mission["description"],
-        "objective": mission["objective"],
         "difficulty": mission["difficulty"],
         "availableBlocks": deepcopy(mission["availableBlocks"]),
     }
@@ -258,3 +259,19 @@ def rank_players(players: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def choose_random_mission_id() -> str:
     return random.choice(MISSIONS)["id"]
+
+
+def build_match_mission_ids(round_count: int) -> list[str]:
+    if round_count <= len(MISSIONS):
+        sampled = random.sample(MISSIONS, k=round_count)
+        return [mission["id"] for mission in sampled]
+
+    queue: list[str] = []
+    while len(queue) < round_count:
+        queue.extend(mission["id"] for mission in random.sample(MISSIONS, k=len(MISSIONS)))
+
+    return queue[:round_count]
+
+
+def get_mission_hint(mission_id: str) -> str:
+    return MISSIONS_BY_ID[mission_id]["hint"]

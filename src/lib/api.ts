@@ -104,6 +104,10 @@ export function validateTurn(session: PlayerSession, flowIds: string[]) {
   return authedPost(`/api/rooms/${session.roomCode}/validate`, session, { flowIds });
 }
 
+export function requestHint(session: PlayerSession) {
+  return authedPost(`/api/rooms/${session.roomCode}/hint`, session);
+}
+
 export function restartRoom(session: PlayerSession) {
   return authedPost(`/api/rooms/${session.roomCode}/restart`, session);
 }

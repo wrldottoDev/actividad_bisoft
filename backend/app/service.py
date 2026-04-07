@@ -9,10 +9,13 @@ from typing import Any
 from fastapi import HTTPException, status
 
 from .missions import (
+    MATCH_MISSION_COUNT,
     MAX_VALIDATION_ATTEMPTS,
+    TURN_TIME_LIMIT_SECONDS,
+    build_match_mission_ids,
     build_validation_message,
     calculate_turn_points,
-    choose_random_mission_id,
+    get_mission_hint,
     get_public_mission,
     rank_players,
     validate_flow,
@@ -49,6 +52,9 @@ class RoomService:
                 "adminId": admin_player["id"],
                 "players": [admin_player],
                 "activeMissionId": None,
+                "missionQueue": [],
+                "roundIndex": 0,
+                "totalRounds": MATCH_MISSION_COUNT,
                 "roundStartedAt": None,
                 "playerStates": {},
                 "turnHistory": {},
@@ -121,10 +127,14 @@ class RoomService:
                     detail="Se necesitan al menos 2 jugadores para iniciar.",
                 )
 
-            mission_id = choose_random_mission_id()
+            mission_queue = build_match_mission_ids(MATCH_MISSION_COUNT)
+            mission_id = mission_queue[0]
             now = utc_now_iso()
             room_state["status"] = "playing"
             room_state["activeMissionId"] = mission_id
+            room_state["missionQueue"] = mission_queue
+            room_state["roundIndex"] = 0
+            room_state["totalRounds"] = MATCH_MISSION_COUNT
             room_state["roundStartedAt"] = now
             room_state["playerStates"] = {
                 player["id"]: self._build_player_state(mission_id, now)
@@ -154,11 +164,39 @@ class RoomService:
                 )
 
             player_state = self._get_player_state(room_state, player_id)
+            submitted_started_at = player_state["startedAt"]
             if player_state["isFinished"]:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail="Ya terminaste tu misión en esta ronda.",
                 )
+
+            changed = self._expire_overdue_players(room_state)
+            if changed:
+                self.repository.save_room(room_state)
+                refreshed_state = self._get_player_state(room_state, player_id)
+                if (
+                    refreshed_state["isFinished"]
+                    or refreshed_state["startedAt"] != submitted_started_at
+                ):
+                    return room_state
+
+            player_state = self._get_player_state(room_state, player_id)
+            if (
+                self._elapsed_seconds_uncapped(player_state["startedAt"])
+                > TURN_TIME_LIMIT_SECONDS
+            ):
+                player_state["attemptsUsed"] = MAX_VALIDATION_ATTEMPTS
+                self._finalize_player_result(
+                    room_state=room_state,
+                    player_id=player_id,
+                    flow_ids=[],
+                    validation=validate_flow([], player_state["missionId"]),
+                    is_correct=False,
+                    feedback="Tiempo agotado: la ronda se cerró al llegar al minuto.",
+                )
+                self.repository.save_room(room_state)
+                return room_state
 
             mission_id = player_state["missionId"]
             validation = validate_flow(flow_ids, mission_id)
@@ -194,6 +232,50 @@ class RoomService:
             self.repository.save_room(room_state)
             return room_state
 
+    async def use_hint(
+        self,
+        room_code: str,
+        player_id: str,
+        token: str,
+    ) -> dict[str, Any]:
+        async with self._lock:
+            room_state = self._load_room_or_404(room_code)
+            player = self._authenticate(room_state, player_id, token)
+
+            if room_state["status"] != "playing":
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="No hay una ronda activa para pedir pista.",
+                )
+
+            player_state = self._get_player_state(room_state, player_id)
+            requested_started_at = player_state["startedAt"]
+            changed = self._expire_overdue_players(room_state)
+            player_state = self._get_player_state(room_state, player_id)
+            if changed and player_state["startedAt"] != requested_started_at:
+                self.repository.save_room(room_state)
+                return room_state
+            if player_state["isFinished"]:
+                if changed:
+                    self.repository.save_room(room_state)
+                    return room_state
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Ya terminaste tu misión en esta ronda.",
+                )
+
+            if not player_state["hintUsed"]:
+                player_state["hintUsed"] = True
+                player_state["hintText"] = get_mission_hint(player_state["missionId"])
+                player["hintsUsed"] += 1
+                room_state["updatedAt"] = utc_now_iso()
+                changed = True
+
+            if changed:
+                self.repository.save_room(room_state)
+
+            return room_state
+
     async def restart_room(
         self,
         room_code: str,
@@ -210,9 +292,13 @@ class RoomService:
                 player["totalTime"] = 0
                 player["turnsCompleted"] = 0
                 player["solvedMissions"] = 0
+                player["hintsUsed"] = 0
 
             room_state["status"] = "lobby"
             room_state["activeMissionId"] = None
+            room_state["missionQueue"] = []
+            room_state["roundIndex"] = 0
+            room_state["totalRounds"] = MATCH_MISSION_COUNT
             room_state["roundStartedAt"] = None
             room_state["playerStates"] = {}
             room_state["turnHistory"] = {}
@@ -220,6 +306,15 @@ class RoomService:
             self.repository.save_room(room_state)
 
         return room_state
+
+    async def sync_room_progress(self, room_code: str) -> dict[str, Any] | None:
+        async with self._lock:
+            room_state = self._load_room_or_404(room_code)
+            if not self._expire_overdue_players(room_state):
+                return None
+
+            self.repository.save_room(room_state)
+            return room_state
 
     def get_room_state(self, room_code: str) -> dict[str, Any] | None:
         room_state = self.repository.get_room(room_code.strip().upper())
@@ -266,6 +361,12 @@ class RoomService:
                 "totalPlayers": total_players,
                 "completedPlayers": completed_players,
                 "remainingPlayers": max(0, total_players - completed_players),
+                "roundNumber": min(
+                    room_state.get("roundIndex", 0) + 1,
+                    room_state.get("totalRounds", MATCH_MISSION_COUNT),
+                ),
+                "totalRounds": room_state.get("totalRounds", MATCH_MISSION_COUNT),
+                "timeLimitSeconds": TURN_TIME_LIMIT_SECONDS,
             }
 
         mission = None
@@ -281,6 +382,8 @@ class RoomService:
                 ),
                 "isFinished": viewer_state["isFinished"],
                 "feedback": viewer_state["feedback"],
+                "hintUsed": viewer_state.get("hintUsed", False),
+                "hintText": viewer_state.get("hintText"),
             }
             my_result = viewer_state["result"]
 
@@ -299,6 +402,7 @@ class RoomService:
                 "totalTime": player["totalTime"],
                 "turnsCompleted": player["turnsCompleted"],
                 "solvedMissions": player["solvedMissions"],
+                "hintsUsed": player.get("hintsUsed", 0),
                 "isAdmin": player["id"] == room_state["adminId"],
                 "isOnline": player["id"] in online_ids,
                 "isFinished": player_states.get(player["id"], {}).get("isFinished", False),
@@ -340,6 +444,7 @@ class RoomService:
             "totalTime": 0,
             "turnsCompleted": 0,
             "solvedMissions": 0,
+            "hintsUsed": 0,
             "joinedAt": utc_now_iso(),
         }
 
@@ -349,6 +454,8 @@ class RoomService:
             "startedAt": started_at,
             "attemptsUsed": 0,
             "feedback": "",
+            "hintUsed": False,
+            "hintText": None,
             "result": None,
             "isFinished": False,
             "completedAt": None,
@@ -386,20 +493,48 @@ class RoomService:
         return normalized_state
 
     def _normalize_room_state(self, room_state: dict[str, Any]) -> dict[str, Any]:
+        normalized_players = [
+            {
+                **player,
+                "hintsUsed": player.get("hintsUsed", 0),
+            }
+            for player in room_state["players"]
+        ]
+
         if (
             "activeMissionId" in room_state
+            and "missionQueue" in room_state
+            and "roundIndex" in room_state
+            and "totalRounds" in room_state
             and "roundStartedAt" in room_state
             and "playerStates" in room_state
         ):
-            return room_state
+            normalized_player_states = {
+                player_id: {
+                    **player_state,
+                    "hintUsed": player_state.get("hintUsed", False),
+                    "hintText": player_state.get("hintText"),
+                }
+                for player_id, player_state in room_state["playerStates"].items()
+            }
+
+            return {
+                **room_state,
+                "players": normalized_players,
+                "playerStates": normalized_player_states,
+                "totalRounds": room_state.get("totalRounds", MATCH_MISSION_COUNT),
+            }
 
         # Migrates rooms from the older sequential-turn schema to a safe lobby state.
         return {
             "code": room_state["code"],
             "status": "lobby",
             "adminId": room_state["adminId"],
-            "players": room_state["players"],
+            "players": normalized_players,
             "activeMissionId": None,
+            "missionQueue": [],
+            "roundIndex": 0,
+            "totalRounds": MATCH_MISSION_COUNT,
             "roundStartedAt": None,
             "playerStates": {},
             "turnHistory": {},
@@ -428,6 +563,85 @@ class RoomService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Solo el admin puede hacer eso.",
             )
+
+    def _elapsed_seconds(self, started_at: str | None) -> int:
+        started_at_dt = parse_iso_datetime(started_at)
+        if started_at_dt is None:
+            return 1
+
+        elapsed = math.ceil((datetime.now(UTC) - started_at_dt).total_seconds())
+        return max(1, min(TURN_TIME_LIMIT_SECONDS, elapsed))
+
+    def _expire_overdue_players(self, room_state: dict[str, Any]) -> bool:
+        if room_state["status"] != "playing":
+            return False
+
+        active_mission_id = room_state["activeMissionId"]
+        expired_player_ids = [
+            player_id
+            for player_id, player_state in room_state["playerStates"].items()
+            if (
+                not player_state.get("isFinished")
+                and self._elapsed_seconds_uncapped(player_state["startedAt"])
+                > TURN_TIME_LIMIT_SECONDS
+            )
+        ]
+
+        changed = False
+        for expired_player_id in expired_player_ids:
+            player_state = room_state["playerStates"].get(expired_player_id)
+            if player_state is None or player_state.get("isFinished"):
+                continue
+
+            player_state["attemptsUsed"] = MAX_VALIDATION_ATTEMPTS
+            self._finalize_player_result(
+                room_state=room_state,
+                player_id=expired_player_id,
+                flow_ids=[],
+                validation=validate_flow([], player_state["missionId"]),
+                is_correct=False,
+                feedback="Tiempo agotado: no se registró una respuesta válida antes del minuto.",
+            )
+            changed = True
+
+            if (
+                room_state["status"] != "playing"
+                or room_state["activeMissionId"] != active_mission_id
+            ):
+                break
+
+        return changed
+
+    def _elapsed_seconds_uncapped(self, started_at: str | None) -> int:
+        started_at_dt = parse_iso_datetime(started_at)
+        if started_at_dt is None:
+            return 1
+
+        elapsed = math.ceil((datetime.now(UTC) - started_at_dt).total_seconds())
+        return max(1, elapsed)
+
+    def _advance_round_if_needed(self, room_state: dict[str, Any]) -> None:
+        if not all(state.get("isFinished") for state in room_state["playerStates"].values()):
+            return
+
+        next_round_index = room_state.get("roundIndex", 0) + 1
+        total_rounds = room_state.get("totalRounds", MATCH_MISSION_COUNT)
+
+        if next_round_index < total_rounds:
+            next_mission_id = room_state["missionQueue"][next_round_index]
+            now = utc_now_iso()
+            room_state["roundIndex"] = next_round_index
+            room_state["activeMissionId"] = next_mission_id
+            room_state["roundStartedAt"] = now
+            room_state["playerStates"] = {
+                player["id"]: self._build_player_state(next_mission_id, now)
+                for player in room_state["players"]
+            }
+            room_state["updatedAt"] = now
+            return
+
+        room_state["status"] = "finished"
+        room_state["updatedAt"] = utc_now_iso()
 
     def _get_player(self, room_state: dict[str, Any], player_id: str) -> dict[str, Any]:
         for player in room_state["players"]:
@@ -481,12 +695,7 @@ class RoomService:
     ) -> None:
         player = self._get_player(room_state, player_id)
         player_state = self._get_player_state(room_state, player_id)
-        started_at = parse_iso_datetime(player_state["startedAt"])
-        now = datetime.now(UTC)
-        elapsed_seconds = 1
-
-        if started_at is not None:
-            elapsed_seconds = max(1, math.ceil((now - started_at).total_seconds()))
+        elapsed_seconds = self._elapsed_seconds(player_state["startedAt"])
 
         attempts_used = player_state["attemptsUsed"]
         points_earned = calculate_turn_points(
@@ -532,6 +741,4 @@ class RoomService:
 
         room_state["turnHistory"].setdefault(player_id, []).append(result)
         room_state["updatedAt"] = utc_now_iso()
-
-        if all(state.get("isFinished") for state in room_state["playerStates"].values()):
-            room_state["status"] = "finished"
+        self._advance_round_if_needed(room_state)

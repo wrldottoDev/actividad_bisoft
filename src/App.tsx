@@ -19,6 +19,7 @@ function App() {
     joinRoom,
     startGame,
     validateFlow,
+    requestHint,
     restartMatch,
     clearLocalSession,
   } = useRoomGame();
@@ -82,14 +83,22 @@ function App() {
             player={room.me}
             mission={room.mission}
             ranking={room.players}
+            roundNumber={room.round?.roundNumber ?? 1}
+            totalRounds={room.round?.totalRounds ?? 3}
             totalPlayers={room.round?.totalPlayers ?? room.playerCount}
             completedPlayers={room.round?.completedPlayers ?? 0}
             startedAt={room.myState.startedAt}
             attemptsRemaining={room.myState.attemptsRemaining}
             feedback={room.myState.feedback}
+            hintUsed={room.myState.hintUsed}
+            hintText={room.myState.hintText}
+            timeLimitSeconds={room.round?.timeLimitSeconds ?? 60}
             isSubmitting={isBusy}
             onValidateFlow={(flowIds) => {
               void validateFlow(flowIds);
+            }}
+            onUseHint={() => {
+              void requestHint();
             }}
           />
         );
@@ -135,7 +144,7 @@ function App() {
           <div>
             <p className="eyebrow">Endpoint Heist</p>
             <h1 className="text-2xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-3xl">
-              Sala remota simultánea con código y ranking final
+              Sala remota simultánea con 3 retos y ranking final
             </h1>
           </div>
 

@@ -5,22 +5,34 @@ interface ScorePanelProps {
   currentPlayer: RoomPlayer;
   ranking: RoomPlayer[];
   elapsedSeconds: number;
+  remainingSeconds: number;
   attemptsRemaining: number;
   completedPlayers: number;
   totalPlayers: number;
+  roundNumber: number;
+  totalRounds: number;
 }
 
 export function ScorePanel({
   currentPlayer,
   ranking,
   elapsedSeconds,
+  remainingSeconds,
   attemptsRemaining,
   completedPlayers,
   totalPlayers,
+  roundNumber,
+  totalRounds,
 }: ScorePanelProps) {
   return (
     <section className="panel p-5 sm:p-6">
-      <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
+        <div className="stat-card">
+          <span className="stat-label">Ronda</span>
+          <strong className="stat-value">
+            {roundNumber}/{totalRounds}
+          </strong>
+        </div>
         <div className="stat-card">
           <span className="stat-label">Progreso</span>
           <strong className="stat-value">
@@ -28,8 +40,8 @@ export function ScorePanel({
           </strong>
         </div>
         <div className="stat-card">
-          <span className="stat-label">Cronómetro</span>
-          <strong className="stat-value">{formatTime(elapsedSeconds)}</strong>
+          <span className="stat-label">Tiempo restante</span>
+          <strong className="stat-value">{formatTime(remainingSeconds)}</strong>
         </div>
         <div className="stat-card">
           <span className="stat-label">Intentos restantes</span>
@@ -46,7 +58,9 @@ export function ScorePanel({
             <p className="text-2xl font-semibold tracking-[-0.04em] text-slate-950">
               {currentPlayer.score} pts
             </p>
-            <p className="text-sm text-slate-500">{currentPlayer.name}</p>
+            <p className="text-sm text-slate-500">
+              {currentPlayer.name} · transcurrido {formatTime(elapsedSeconds)}
+            </p>
           </div>
           <span className="soft-pill">Desempate por menor tiempo</span>
         </div>

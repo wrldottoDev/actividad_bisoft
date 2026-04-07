@@ -26,8 +26,8 @@ export function FinalRankingScreen({
               {winner ? `${winner.name} gana la sala` : 'Partida finalizada'}
             </h2>
             <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600">
-              El ranking final se ordena por mayor puntuación y, si hay empate, por
-              menor tiempo total.
+              La partida agrupa 3 desafíos consecutivos. El ranking final se ordena por
+              mayor puntuación y, si hay empate, por menor tiempo total.
             </p>
           </div>
 
@@ -51,7 +51,7 @@ export function FinalRankingScreen({
               <h3 className="text-3xl font-semibold tracking-[-0.05em]">
                 {winner.name}
               </h3>
-              <div className="mt-6 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+              <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-[22px] bg-white/8 px-4 py-3 ring-1 ring-white/10">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-300">
                     Puntos
@@ -73,6 +73,12 @@ export function FinalRankingScreen({
                   <p className="mt-2 text-2xl font-semibold">
                     {winner.solvedMissions}
                   </p>
+                </div>
+                <div className="rounded-[22px] bg-white/8 px-4 py-3 ring-1 ring-white/10">
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-300">
+                    Pistas
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold">{winner.hintsUsed}</p>
                 </div>
               </div>
             </div>
@@ -101,7 +107,7 @@ export function FinalRankingScreen({
                       </p>
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="grid gap-3 sm:grid-cols-4">
                       <div>
                         <p
                           className={`text-xs uppercase tracking-[0.18em] ${
@@ -132,11 +138,21 @@ export function FinalRankingScreen({
                             player.id === winnerId ? 'text-slate-300' : 'text-slate-400'
                           }`}
                         >
-                          Resultado
+                          Misiones
                         </p>
                         <p className="mt-1 text-sm font-medium">
-                          {player.solvedMissions > 0 ? 'Resuelta' : 'No resuelta'}
+                          {player.solvedMissions}/3
                         </p>
+                      </div>
+                      <div>
+                        <p
+                          className={`text-xs uppercase tracking-[0.18em] ${
+                            player.id === winnerId ? 'text-slate-300' : 'text-slate-400'
+                          }`}
+                        >
+                          Pistas
+                        </p>
+                        <p className="mt-1 text-sm font-medium">{player.hintsUsed}</p>
                       </div>
                     </div>
                   </div>

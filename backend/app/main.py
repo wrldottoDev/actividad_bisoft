@@ -127,6 +127,18 @@ async def validate_turn(room_code: str, payload: ValidateTurnRequest) -> dict:
     return {"room": room}
 
 
+@app.post("/api/rooms/{room_code}/hint")
+async def use_hint(room_code: str, payload: AuthRequest) -> dict:
+    room_state = await room_service.use_hint(room_code, payload.playerId, payload.token)
+    await broadcast_room(room_state)
+    room = room_service.build_snapshot(
+        room_state,
+        payload.playerId,
+        connection_manager.online_ids(room_state["code"]) | {payload.playerId},
+    )
+    return {"room": room}
+
+
 @app.post("/api/rooms/{room_code}/restart")
 async def restart_room(room_code: str, payload: AuthRequest) -> dict:
     room_state = await room_service.restart_room(room_code, payload.playerId, payload.token)
@@ -191,6 +203,9 @@ async def room_websocket(
                 continue
 
             if payload.get("type") == "ping":
+                room_state = await room_service.sync_room_progress(normalized_code)
+                if room_state is not None:
+                    await broadcast_room(room_state)
                 await websocket.send_json({"type": "pong"})
     except WebSocketDisconnect:
         connection_manager.disconnect(normalized_code, player_id)

@@ -26,7 +26,7 @@ export function LobbyScreen({
           </h2>
           <p className="mt-4 text-base leading-7 text-slate-600">
             Comparte este código con los demás jugadores. Cuando el admin inicie,
-            todos recibirán la misma misión al mismo tiempo.
+            todos recibirán la primera de 3 pruebas consecutivas de 60 segundos.
           </p>
 
           <div className="mt-6 rounded-[30px] border border-slate-200/70 bg-slate-950 p-5 text-white">

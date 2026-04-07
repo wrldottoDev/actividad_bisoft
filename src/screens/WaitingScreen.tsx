@@ -20,7 +20,7 @@ export function WaitingScreen({ room, connectionStatus }: WaitingScreenProps) {
           </h2>
           <p className="mt-4 text-base leading-7 text-slate-600">
             {room.round
-              ? `Van ${room.round.completedPlayers} de ${room.round.totalPlayers} jugadores resueltos.`
+              ? `Ronda ${room.round.roundNumber} de ${room.round.totalRounds}. Van ${room.round.completedPlayers} de ${room.round.totalPlayers} jugadores resueltos.`
               : 'La sala sigue sincronizando el progreso.'}
           </p>
 
